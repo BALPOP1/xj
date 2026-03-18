@@ -1,0 +1,6 @@
+# ZM Elite Bot Suite — Python dependencies
+# Pin exact versions for reproducible Railway builds
+
+pyTelegramBotAPI==4.18.0
+gspread==6.1.2
+oauth2client==4.1.3
