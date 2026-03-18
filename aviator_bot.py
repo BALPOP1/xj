@@ -47,8 +47,9 @@ _GROUP_ID  = config.AVIATOR_GROUP_ID
 _SHEET_URL = f"https://docs.google.com/spreadsheets/d/{_SHEET_ID}"
 
 # Callback-data prefixes — must be unique across all bots
-_CB_APPROVE = "av_approve_"
-_CB_REJECT  = "av_reject_"
+_CB_APPROVE  = "av_approve_"
+_CB_REJECT   = "av_reject_"
+_CB_REVERIFY = "av_reverify_"   # lets stuck users re-submit without admin help
 
 
 # ---------------------------------------------------------------------------
@@ -132,19 +133,39 @@ def handle_signal(message: telebot.types.Message) -> None:
         bot.send_message(message.chat.id, signals.generate_aviator_signal())
 
     elif status == sheets.STATUS_PENDING:
+        # Offer a re-submit button in case the previous attempt got stuck mid-flow
+        # (e.g. bot restarted before the photo reached the admin group)
+        markup = InlineKeyboardMarkup()
+        markup.add(
+            InlineKeyboardButton(
+                "🔄 Re-submit Verification",
+                callback_data=f"{_CB_REVERIFY}{user.id}",
+            )
+        )
         bot.send_message(
             message.chat.id,
             "⏳ <b>Verification Pending</b>\n\n"
-            "Your request is still being reviewed by our team.\n"
-            "You'll receive a notification once your account is approved. Please wait!",
+            "Your request is being reviewed by our team.\n"
+            "You'll be notified once your account is approved.\n\n"
+            "<i>Did your submission get interrupted? Tap the button below to re-submit.</i>",
+            reply_markup=markup,
         )
 
     elif status == sheets.STATUS_REJECTED:
+        # Allow rejected users to re-apply after contacting support
+        markup = InlineKeyboardMarkup()
+        markup.add(
+            InlineKeyboardButton(
+                "🔄 Re-submit Verification",
+                callback_data=f"{_CB_REVERIFY}{user.id}",
+            )
+        )
         bot.send_message(
             message.chat.id,
             "❌ <b>Access Denied</b>\n\n"
-            "Your verification was not approved.\n"
-            "Please contact our support team for assistance.",
+            "Your previous verification was not approved.\n"
+            "If you believe this is a mistake, you may re-submit below.",
+            reply_markup=markup,
         )
 
     else:
@@ -171,6 +192,29 @@ def handle_getlog(message: telebot.types.Message) -> None:
         message,
         f"📊 <b>Aviator Members Database:</b>\n"
         f"<a href=\"{_SHEET_URL}\">Open Spreadsheet</a>",
+    )
+
+
+# ---------------------------------------------------------------------------
+# /myid  (debugging helper — works in any chat)
+# ---------------------------------------------------------------------------
+
+@bot.message_handler(commands=["myid"])
+def handle_myid(message: telebot.types.Message) -> None:
+    """
+    Replies with the current chat ID and user ID.
+
+    Use this in your admin group to find the correct GROUP_ID to set as
+    the AVIATOR_GROUP_ID environment variable on Railway.
+
+    Args:
+        message (telebot.types.Message): Incoming /myid command.
+    """
+    bot.reply_to(
+        message,
+        f"🆔 <b>Chat ID:</b> <code>{message.chat.id}</code>\n"
+        f"👤 <b>Your User ID:</b> <code>{message.from_user.id}</code>\n\n"
+        f"<i>Set AVIATOR_GROUP_ID to the Chat ID above on Railway.</i>",
     )
 
 
@@ -264,11 +308,6 @@ def _receive_verification_photo(message: telebot.types.Message, member_id: str) 
     username = f"@{user.username}" if user.username else "No Username"
 
     try:
-        # Persist the pending record in Google Sheets
-        sheets.upsert_pending_user(
-            _SHEET_ID, user.id, username, user.first_name, member_id
-        )
-
         # Build the admin notification caption using HTML + escaped user content
         caption = (
             "🔔 <b>NEW VERIFICATION REQUEST</b>\n"
@@ -293,6 +332,8 @@ def _receive_verification_photo(message: telebot.types.Message, member_id: str) 
 
         # IMPORTANT: parse_mode must be explicit here — constructor default
         # does NOT apply to send_photo captions in pyTelegramBotAPI.
+        # Send to group FIRST — only mark user as Pending in the sheet after
+        # success so a failed send never leaves the user permanently stuck.
         bot.send_photo(
             _GROUP_ID,
             photo_file_id,
@@ -301,7 +342,12 @@ def _receive_verification_photo(message: telebot.types.Message, member_id: str) 
             parse_mode="HTML",
         )
 
-        # Confirm to the user only after group send succeeds
+        # Photo reached the group — now persist the pending record in Google Sheets
+        sheets.upsert_pending_user(
+            _SHEET_ID, user.id, username, user.first_name, member_id
+        )
+
+        # Confirm to the user only after both the send and the sheet update succeed
         bot.send_message(
             message.chat.id,
             "📤 <b>Verification Submitted!</b>\n\n"
@@ -315,7 +361,7 @@ def _receive_verification_photo(message: telebot.types.Message, member_id: str) 
         bot.send_message(
             message.chat.id,
             "❌ <b>Something went wrong</b> while submitting your verification.\n\n"
-            "Please try again by sending /signal. "
+            "Please tap <b>Re-submit Verification</b> from /signal to try again.\n"
             "If the problem persists, contact our support team.",
         )
 
@@ -406,13 +452,59 @@ def handle_admin_callback(call: telebot.types.CallbackQuery) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Callback: Re-submit verification (from Pending / Rejected inline button)
+# ---------------------------------------------------------------------------
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith(_CB_REVERIFY))
+def handle_reverify_callback(call: telebot.types.CallbackQuery) -> None:
+    """
+    Triggered when a Pending or Rejected user taps "Re-submit Verification".
+
+    Removes the inline button from the previous message to prevent duplicate
+    submissions, then restarts the two-step verification flow from step 1.
+
+    Args:
+        call (telebot.types.CallbackQuery): Callback from the inline button.
+    """
+    bot.answer_callback_query(call.id)
+
+    # Remove the button so it cannot be tapped again
+    try:
+        bot.edit_message_reply_markup(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=None,
+        )
+    except Exception:
+        pass  # Non-critical — proceed even if the edit fails
+
+    # Restart the verification flow from step 1
+    _ask_for_member_id(call.message)
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
 def run() -> None:
     """
     Starts the Aviator bot with long-polling.
+
+    Calls remove_webhook() first to clear any lingering webhook or competing
+    polling session that would cause a 409 Conflict error.  skip_pending=True
+    discards updates that queued up while the bot was offline.
+
     Intended to be called from main.py inside a daemon thread.
     """
     print("✅ [Aviator] ZM Elite | Aviator Predator AI is running...")
-    bot.infinity_polling(timeout=30, long_polling_timeout=20)
+    print(f"   ➤ Forwarding verifications to GROUP_ID: {_GROUP_ID}")
+    print("   ➤ Tip: send /myid inside your admin group to confirm the correct ID.")
+
+    # Remove any existing webhook so polling can start without a 409 conflict
+    bot.remove_webhook()
+
+    bot.infinity_polling(
+        timeout=30,
+        long_polling_timeout=20,
+        skip_pending=True,       # discard stale updates from while bot was offline
+    )
