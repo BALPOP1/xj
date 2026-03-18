@@ -7,6 +7,9 @@ Produces realistic, randomised trading signals for two games:
   • Aviator  — crash-style multiplier game
   • Chicken Road 2 — obstacle-crossing game
 
+All output is formatted with Telegram HTML tags (<b>, <code>, <i>) so
+that bot files can send them safely using parse_mode="HTML".
+
 The probability distributions are weighted to match realistic game
 statistics (most rounds are low-to-medium, rare rounds are high).
 """
@@ -21,7 +24,7 @@ from datetime import datetime
 
 def generate_aviator_signal() -> str:
     """
-    Generates a randomised Aviator crash-game signal.
+    Generates a randomised Aviator crash-game signal (HTML formatted).
 
     Uses a weighted distribution:
       • 50 % probability → low multiplier  (1.50 – 3.00x)
@@ -29,44 +32,44 @@ def generate_aviator_signal() -> str:
       • 15 % probability → high multiplier (7.01 – 20.00x)
 
     Returns:
-        str: A Markdown-formatted signal message ready to be sent via Telegram.
+        str: A Telegram HTML-formatted signal message.
     """
     rand = random.random()
 
     if rand < 0.50:
-        multiplier  = round(random.uniform(1.50, 3.00), 2)
-        confidence  = random.randint(78, 91)
-        risk_label  = "🟢 LOW RISK"
-        tip         = "Safe entry — ideal for conservative players."
+        multiplier = round(random.uniform(1.50, 3.00), 2)
+        confidence = random.randint(78, 91)
+        risk_label = "🟢 LOW RISK"
+        tip        = "Safe entry — ideal for conservative players."
     elif rand < 0.85:
-        multiplier  = round(random.uniform(3.01, 7.00), 2)
-        confidence  = random.randint(65, 80)
-        risk_label  = "🟡 MEDIUM RISK"
-        tip         = "Good reward-to-risk ratio. Manage your bet size."
+        multiplier = round(random.uniform(3.01, 7.00), 2)
+        confidence = random.randint(65, 80)
+        risk_label = "🟡 MEDIUM RISK"
+        tip        = "Good reward-to-risk ratio. Manage your bet size."
     else:
-        multiplier  = round(random.uniform(7.01, 20.00), 2)
-        confidence  = random.randint(50, 68)
-        risk_label  = "🔴 HIGH RISK"
-        tip         = "Rare window — only bet what you can afford to lose."
+        multiplier = round(random.uniform(7.01, 20.00), 2)
+        confidence = random.randint(50, 68)
+        risk_label = "🔴 HIGH RISK"
+        tip        = "Rare window — only bet what you can afford to lose."
 
     # Suggest cashing out slightly below the predicted peak for safety
-    cashout    = round(multiplier * random.uniform(0.80, 0.90), 2)
-    bet_pct    = random.choice(["10%", "15%", "20%", "25%"])
-    timestamp  = datetime.now().strftime("%H:%M:%S")
+    cashout   = round(multiplier * random.uniform(0.80, 0.90), 2)
+    bet_pct   = random.choice(["10%", "15%", "20%", "25%"])
+    timestamp = datetime.now().strftime("%H:%M:%S")
 
     return (
-        "✈️ *ZM ELITE | AVIATOR PREDATOR AI*\n"
+        "✈️ <b>ZM ELITE | AVIATOR PREDATOR AI</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🕐 *Signal Time:* `{timestamp}`\n"
-        f"🎯 *Predicted Multiplier:* `{multiplier}x`\n"
-        f"💡 *Recommended Cashout:* `{cashout}x`\n"
-        f"📊 *AI Confidence:* `{confidence}%`\n"
-        f"⚠️  *Risk Level:* {risk_label}\n"
-        f"💰 *Suggested Bet Size:* `{bet_pct} of balance`\n"
+        f"🕐 <b>Signal Time:</b> <code>{timestamp}</code>\n"
+        f"🎯 <b>Predicted Multiplier:</b> <code>{multiplier}x</code>\n"
+        f"💡 <b>Recommended Cashout:</b> <code>{cashout}x</code>\n"
+        f"📊 <b>AI Confidence:</b> <code>{confidence}%</code>\n"
+        f"⚠️  <b>Risk Level:</b> {risk_label}\n"
+        f"💰 <b>Suggested Bet Size:</b> <code>{bet_pct} of balance</code>\n"
         "━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💬 _{tip}_\n"
-        "⚡ _Signal is time-sensitive — act on the next round!_\n"
-        "🤖 _Powered by ZM Predator AI Engine_"
+        f"💬 <i>{tip}</i>\n"
+        "⚡ <i>Signal is time-sensitive — act on the next round!</i>\n"
+        "🤖 <i>Powered by ZM Predator AI Engine</i>"
     )
 
 
@@ -76,7 +79,7 @@ def generate_aviator_signal() -> str:
 
 def generate_chicken_signal() -> str:
     """
-    Generates a randomised Chicken Road 2 game signal.
+    Generates a randomised Chicken Road 2 game signal (HTML formatted).
 
     Uses a weighted distribution:
       • 50 % probability → safe path   (3–5 obstacles,  1.50 – 3.50x)
@@ -84,41 +87,41 @@ def generate_chicken_signal() -> str:
       • 15 % probability → danger path (10–15 obstacles, 8.01 – 20.00x)
 
     Returns:
-        str: A Markdown-formatted signal message ready to be sent via Telegram.
+        str: A Telegram HTML-formatted signal message.
     """
     rand = random.random()
 
     if rand < 0.50:
-        obstacles   = random.randint(3, 5)
-        multiplier  = round(random.uniform(1.50, 3.50), 2)
-        path_label  = "🟢 SAFE PATH"
-        tip         = "Low risk — great for building your balance."
+        obstacles  = random.randint(3, 5)
+        multiplier = round(random.uniform(1.50, 3.50), 2)
+        path_label = "🟢 SAFE PATH"
+        tip        = "Low risk — great for building your balance."
     elif rand < 0.85:
-        obstacles   = random.randint(6, 9)
-        multiplier  = round(random.uniform(3.51, 8.00), 2)
-        path_label  = "🟡 MODERATE PATH"
-        tip         = "Balanced play — stop when you hit the target multiplier."
+        obstacles  = random.randint(6, 9)
+        multiplier = round(random.uniform(3.51, 8.00), 2)
+        path_label = "🟡 MODERATE PATH"
+        tip        = "Balanced play — stop when you hit the target multiplier."
     else:
-        obstacles   = random.randint(10, 15)
-        multiplier  = round(random.uniform(8.01, 20.00), 2)
-        path_label  = "🔴 DANGER PATH"
-        tip         = "High reward, high risk — experienced players only."
+        obstacles  = random.randint(10, 15)
+        multiplier = round(random.uniform(8.01, 20.00), 2)
+        path_label = "🔴 DANGER PATH"
+        tip        = "High reward, high risk — experienced players only."
 
     confidence = random.randint(62, 93)
     bet_pct    = random.choice(["10%", "15%", "20%"])
     timestamp  = datetime.now().strftime("%H:%M:%S")
 
     return (
-        "🐓 *SIGNAL-BOT | CHICKEN ROAD 2*\n"
+        "🐓 <b>SIGNAL-BOT | CHICKEN ROAD 2</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🕐 *Signal Time:* `{timestamp}`\n"
-        f"🚦 *Path Prediction:* {path_label}\n"
-        f"🏁 *Obstacles to Cross:* `{obstacles}`\n"
-        f"💥 *Target Multiplier:* `{multiplier}x`\n"
-        f"📊 *AI Confidence:* `{confidence}%`\n"
-        f"💰 *Suggested Bet Size:* `{bet_pct} of balance`\n"
+        f"🕐 <b>Signal Time:</b> <code>{timestamp}</code>\n"
+        f"🚦 <b>Path Prediction:</b> {path_label}\n"
+        f"🏁 <b>Obstacles to Cross:</b> <code>{obstacles}</code>\n"
+        f"💥 <b>Target Multiplier:</b> <code>{multiplier}x</code>\n"
+        f"📊 <b>AI Confidence:</b> <code>{confidence}%</code>\n"
+        f"💰 <b>Suggested Bet Size:</b> <code>{bet_pct} of balance</code>\n"
         "━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💬 _{tip}_\n"
-        "⚡ _Valid for next round only — do not delay!_\n"
-        "🤖 _Powered by ZM Signal Engine_"
+        f"💬 <i>{tip}</i>\n"
+        "⚡ <i>Valid for next round only — do not delay!</i>\n"
+        "🤖 <i>Powered by ZM Signal Engine</i>"
     )
